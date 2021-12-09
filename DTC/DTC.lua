@@ -44,6 +44,8 @@ local talentList = {
 local CORPSE_RETRIEVAL_DISTANCE = 40
 local ASSIGN_MACROS = true
 
+local out_of_range = false
+
 -- Trigger between emitting game data and frame location data
 SETUP_SEQUENCE = false
 -- Exit process trigger
@@ -51,7 +53,7 @@ EXIT_PROCESS_STATUS = 0
 -- Assigns various macros if user changes variable to true
 ASSIGN_MACROS_INITIALIZE = false
 -- Total number of data frames generated
-local NUMBER_OF_FRAMES = 60
+local NUMBER_OF_FRAMES = 90
 -- Set number of pixel rows
 local FRAME_ROWS = 1
 -- Size of data squares in px. Varies based on rounding errors as well as dimension size. Use as a guideline, but not 100% accurate.
@@ -317,12 +319,24 @@ function DTC:CreateFrames(n)
             -- glutch MakePixelSquareArr(integerToColor(self:GetProfessionLevel("Skinning")), 41) -- Skinning profession level
             -- tracks our fishing level
             -- glutch MakePixelSquareArr(integerToColor(self:GetProfessionLevel("Fishing")), 42) -- Fishing profession level
-            MakePixelSquareArr(integerToColor(self:GetDebuffs("Serpent Sting")), 43)
-            MakePixelSquareArr(integerToColor(self:GetPlayerDebuffs("Weakened Soul")), 44)
-            MakePixelSquareArr(integerToColor(self:GetPlayerBuffs("Aspect of the Hawk")), 47)
-            MakePixelSquareArr(integerToColor(self:GetPlayerBuffs("Aspect of the Cheetah")), 48)
-            MakePixelSquareArr(integerToColor(self:GetPetHappiness()), 45)
-            MakePixelSquareArr(integerToColor(self:GetDebuffs("Hunter's Mark")), 46)
+            
+            --     MakePixelSquareArr(integerToColor(self:GetDebuffs("Serpent Sting")), 43)
+            --     MakePixelSquareArr(integerToColor(self:GetPlayerDebuffs("Weakened Soul")), 44)
+            --     MakePixelSquareArr(integerToColor(self:GetPlayerBuffs("Aspect of the Hawk")), 47)
+            --     MakePixelSquareArr(integerToColor(self:GetPlayerBuffs("Aspect of the Cheetah")), 48)
+            --     MakePixelSquareArr(integerToColor(self:GetPetHappiness()), 45)
+            --     MakePixelSquareArr(integerToColor(self:OutOfRange()), 46)
+
+            -- if (self:GetPlayerClass() == 'Hunter') then
+                MakePixelSquareArr(integerToColor(self:GetDebuffs("Serpent Sting")), 43)
+                MakePixelSquareArr(integerToColor(self:GetPlayerDebuffs("Weakened Soul")), 44)
+                MakePixelSquareArr(integerToColor(self:GetPlayerBuffs("Aspect of the Hawk")), 47)
+                MakePixelSquareArr(integerToColor(self:GetPlayerBuffs("Aspect of the Cheetah")), 48)
+                MakePixelSquareArr(integerToColor(self:GetPetHappiness()), 45)
+                MakePixelSquareArr(integerToColor(self:GetDebuffs("Hunter's Mark")), 46)
+            -- end
+            
+            
             MakePixelSquareArr(integerToColor(self:IsTargetTooHighLevel()), 49)
             MakePixelSquareArr(integerToColor(self:GetPetExists()), 50)
             MakePixelSquareArr(integerToColor(self:GetPetIsDead()), 51)
@@ -330,9 +344,11 @@ function DTC:CreateFrames(n)
             MakePixelSquareArr(integerToColor(self:areBagsFull()), 53)
             MakePixelSquareArr(integerToColor(self:needAmmo()), 54)
             MakePixelSquareArr(integerToColor(self:getPetHp()), 55)
+            MakePixelSquareArr(integerToColor(self:TargetIsOurs()), 56)
             MakePixelSquareArr(integerToColor(self:IsTargetElemental()), 57)
             MakePixelSquareArr(integerToColor(self:isPetInRange()), 58)
-            -- MakePixelSquareArr(integerToColor(self:TargetIsOurs()), 56)
+            MakePixelSquareArr(integerToColor(self:ComboPoints()), 59)
+            MakePixelSquareArr(integerToColor(self:GetXPPct()), 60)
 
 
             
@@ -393,6 +409,20 @@ function DTC:CreateFrames(n)
     windowCheckFrame:SetFrameStrata("LOW")
     setFramePixelBackdrop(windowCheckFrame)
     windowCheckFrame:SetBackdropColor(0.5, 0.1, 0.8, 1)
+
+    -- windowCheckFrame:SetScript("OnEvent", function(self, event, ...)
+    --     if event == "UI_ERROR_MESSAGE" then
+    --         local number, message = ...;
+    --         if (message == 'Out of range.') then
+    --             out_of_range = time()
+    --         end
+    --         if (message == 'You are facing the wrong way!') then
+    --             facing_target = time()
+    --         end
+    --         DTC:log(message)
+    --     end
+    -- end)
+    -- windowCheckFrame:RegisterEvent("UI_ERROR_MESSAGE")
     
     -- creating a new frame to check for open BOE and BOP windows
     local bindingCheckFrame = CreateFrame("Frame", "frame_bindingcheck", UIParent)
@@ -469,6 +499,11 @@ function DTC:GetTargetName(partition)
     return 0
 end
 
+function DTC:GetPlayerClass()
+    local localizedClass, englishClass, classIndex = UnitClass("player")
+    return localizedClass
+end
+
 -- Finds maximum amount of health player can have
 function DTC:getHealthMax(unit)
     local health = UnitHealthMax(unit)
@@ -512,15 +547,20 @@ end
 
 -- Finds if target is attackable with the fireball which is the longest distance spell.
 -- Fireball or a spell with equivalent range must be in slot 2 for this to work
+
 function DTC:isInRange()
-    -- Assigns arbitrary value (50) to note the target is not within range
+    local localizedClass, englishClass, classIndex = UnitClass("player")
     local range = 50
-    if IsActionInRange(2) then range = 35 end -- Checks Fireball Range, slot 2
-    -- if IsActionInRange(3) and self:getPlayerLevel() < 25 then range = 30 end -- Checks Frostbolt Range, slot 3
-    -- if IsActionInRange(10) then range = 30 end -- Checks Counterspell Range, slot 11. Useful for when after arctic reach is applied
-    -- if IsActionInRange(4) then range = 20 end -- Checks Fire Blast Range, slot 4
-    -- if IsActionInRange(3) then range = 20 end -- tror inte detta funkar :<
-    if IsActionInRange(8) then range = 5 end
+
+    if (localizedClass == 'Hunter') then
+        if IsActionInRange(2) then range = 35 end
+        if IsActionInRange(8) then range = 5 end
+    end
+
+    if (localizedClass == 'Rogue') then
+        if IsActionInRange(1) then range = 5 end
+    end
+
     return range
 end
 
@@ -528,6 +568,10 @@ function DTC:isPetInRange()
     local range = 0
     if IsActionInRange(3) then range = 1 end
     return range
+end
+
+function DTC:ComboPoints()
+    return GetComboPoints("player", "target")
 end
 
 -- A function used to check which items we have.
@@ -652,8 +696,32 @@ function DTC:GetProfessionLevel(skill)
     return 0;
 end
 
+function DTC:OutOfRange()
+    DTC:log(out_of_range)
+   if (out_of_range) then
+    DTC:log(time() - out_of_range)
+    return time() - out_of_range
+   else
+    return 999
+   end
+end
 -- Checks target to see if  target has a specified debuff
+function DTC:GetXPPct(debuff_name)
+    local curr = UnitXP("player")
+    local max = UnitXPMax("player")
+    return math.floor((curr / max) * 100)
+end
 function DTC:GetDebuffs(debuff_name)
+    for i=1,40 do
+        local name, rank, iconTexture, count, debuffType, duration, timeLeft = UnitDebuff("target", i); 
+        if name == debuff_name and duration ~=nil then
+          return 1
+        end
+    end
+    return 0
+end
+
+function DTC:FacingTheWrongWay(debuff_name)
     for i=1,40 do
         local name, rank, iconTexture, count, debuffType, duration, timeLeft = UnitDebuff("target", i); 
         if name == debuff_name and duration ~=nil then
@@ -1212,4 +1280,3 @@ function DTC:ResurrectPlayer()
         end
     end
 end
-

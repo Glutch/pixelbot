@@ -4,14 +4,17 @@ const data = require('./NodeGameBot/Engine/data')
 const {keys} = require('regenerator-runtime')
 const {clear} = require('console')
 const sleep = require('util').promisify(setTimeout)
+const chalkAnimation = require('chalk-animation')
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args))
 
 robot.moveMouse(500, 500)
 robot.mouseClick()
 
 // Global options
 const SHOULD_LOOT = true
-const SHOULD_VENDOR = true
-const DEBUGGING = true
+const SHOULD_VENDOR = false
+const DEBUGGING = false
+const STOP_LOOTING_WHEN_BAGS_FULL = true
 
 // Combat routine specific variables
 let paused_navigation = false
@@ -50,6 +53,35 @@ let can_bestial_wrath = true
 let closest_corpse_point = false
 let is_walking_towards_corpse = false
 let cleaned_bags_time = 0
+let starting_xp = false
+let bot_started_at = Date.now()
+let path_is_reversed_cus_of_big_bad_monster = false
+
+let rainbow = chalkAnimation.neon(`
+Starting pixelbot v.13.37
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+`)
 
 const combat_routine = () => {
   if (true) {
@@ -83,9 +115,32 @@ const combat_routine = () => {
         corpseY,
         IsTargetElemental,
         IsPetInRange,
+        GetXPPct,
       } = data.info
       const targetHealthPct = Math.round((targetCurrentHealth / targetMaxHealth) * 100) || 0
       const {slot1, slot2, slot3, slot4, slot5} = data.info.spell
+
+      if (!starting_xp) {
+        starting_xp = GetXPPct
+      }
+
+      rainbow.replace(`
+
+      SHOULD_LOOT: ${SHOULD_LOOT}                                        
+      SHOULD_VENDOR: ${SHOULD_VENDOR}                                            
+      DEBUGGING: ${DEBUGGING}                                            
+      STOP_LOOTING_WHEN_BAGS_FULL: ${STOP_LOOTING_WHEN_BAGS_FULL}               
+                                                                        
+      health: ${health}                                        
+      mana: ${Math.round(mana)}                                            
+      range: ${range}                                            
+      target: ${target}                                            
+                                                               
+      XP: ${GetXPPct}%                                          
+      XP since start: ${GetXPPct - starting_xp}%                 
+      Time per lvl: ${Math.round((((100 / (GetXPPct - starting_xp)) * (Date.now() - bot_started_at)) / 1000 / 60 / 60) * 10) / 10}h                 
+      Mobs Looted: ${mobs_looted}                              
+      `)
 
       if (Date.now() - time_since_combat > 20000 && !playerInCombat && !isDead && !target && !moving_to_vendor) {
         if (hasAspectCheetah == 0 && can_change_aspect) {
@@ -105,21 +160,51 @@ const combat_routine = () => {
             debug('changing to vendor path')
             moving_to_vendor = true
             roam.ResetRoamer()
-            roam.givePath('tanaris47to50_vendor', false, true)
+            roam.givePath('blasted_lands_vendor', false, true)
             roam.walkPath(() => {
-              console.log('arrived at vendor from hunter.js')
+              debug('arrived at vendor from hunter.js')
               pause_nav()
               robot.keyTap('s')
               robot.keyTap('1')
               robot.keyTap('j')
+              robot.keyTap('escape')
+              setTimeout(_ => {
+                robot.keyTap('1')
+                robot.keyTap('j')
+              }, 2000)
+              setTimeout(_ => {
+                robot.keyTap('escape')
+              }, 2500)
+              setTimeout(_ => {
+                robot.keyTap('1')
+                robot.keyTap('j')
+              }, 4000)
+              setTimeout(_ => {
+                robot.keyTap('escape')
+              }, 4500)
+              setTimeout(_ => {
+                robot.keyTap('1')
+                robot.keyTap('j')
+              }, 6000)
+              setTimeout(_ => {
+                robot.keyTap('escape')
+              }, 6500)
+              setTimeout(_ => {
+                robot.keyTap('1')
+                robot.keyTap('j')
+              }, 8000)
+              setTimeout(_ => {
+                robot.keyTap('escape')
+              }, 8500)
+
               setTimeout(_ => {
                 vendor_run_completed = true
                 roam.ResetRoamer()
-                roam.givePath('tanaris47to50_vendor', true, true)
+                roam.givePath('blasted_lands_vendor', true, true)
                 roam.walkPath(() => {
-                  console.log('im back bitches')
-                  roam.givePath('tanaris47to50')
-                  roam.walkPath(() => console.log('continue as usual'))
+                  debug('im back bitches')
+                  roam.givePath('blasted_lands')
+                  roam.walkPath(() => debug('continue as usual'))
                   moving_to_vendor = false
                 })
               }, 5000)
@@ -128,12 +213,12 @@ const combat_routine = () => {
         }
       }
 
-      if (moving_to_vendor && hasAspectCheetah) {
-        robot.keyTap('4')
-      }
+      // if (moving_to_vendor && hasAspectCheetah) {
+      //   robot.keyTap('4')
+      // }
 
       if (isDead && !is_feign_deathing) {
-        if (current_path == 'tanaris47to50') {
+        if (current_path == 'blasted_lands') {
           if (!closest_corpse_point) {
             closest_corpse_point = calculate_nearest_point_to_corpse(corpseX, corpseY)
           }
@@ -142,7 +227,7 @@ const combat_routine = () => {
               is_walking_towards_corpse = true
               pause_nav()
               roam.walkToCorpse(corpseX, corpseY, 'coarse', () => {
-                console.log('reached corpse')
+                debug('reached corpse')
                 is_walking_towards_corpse = false
                 pause_nav()
                 resume_path()
@@ -150,20 +235,20 @@ const combat_routine = () => {
             }
           }
         }
-        if (current_path != 'tanaris47to50_deathrun' && !has_deathrun_completed) {
+        if (current_path != 'blasted_lands_deathrun' && !has_deathrun_completed) {
           roam.ResetRoamer()
-          roam.givePath('tanaris47to50_deathrun')
-          current_path = 'tanaris47to50_deathrun'
-          debug('changed path to tanaris47to50_deathrun')
+          roam.givePath('blasted_lands_deathrun')
+          current_path = 'blasted_lands_deathrun'
+          debug('changed path to blasted_lands_deathrun')
           roam.walkPath(() => {
             debug('Finished deathrun.')
-            debug('changed path to tanaris47to50 from callback')
+            debug('changed path to blasted_lands from callback')
             has_deathrun_completed = true
             closest_corpse_point = false
-            current_path = 'tanaris47to50'
+            current_path = 'blasted_lands'
             roam.ResetRoamer()
-            roam.givePath('tanaris47to50')
-            roam.walkPath(() => console.log('restart normal path'))
+            roam.givePath('blasted_lands')
+            roam.walkPath(() => debug('restart normal path'))
             roam.resumeNavigation()
           })
           roam.ChangeToDeathRun(true)
@@ -211,7 +296,7 @@ const combat_routine = () => {
           return
         }
 
-        if (!playerInCombat && Date.now() > cleaned_bags_time + 30 * 1000) {
+        if (!playerInCombat && Date.now() > cleaned_bags_time + 2 * 60 * 1000) {
           debug('cleaned bags by pixel coordinate + bagnon')
           cleaned_bags_time = Date.now()
           robot.moveMouse(2934, 567)
@@ -255,6 +340,26 @@ const combat_routine = () => {
           debug('target pet target 2')
         }
 
+        if (target == 'TEREMU') {
+          if (can_reverse_path) {
+            can_reverse_path = false
+            setTimeout(_ => {
+              can_reverse_path = true
+            }, 2000)
+            clear_target()
+            path_is_reversed_cus_of_big_bad_monster = !path_is_reversed_cus_of_big_bad_monster
+            pause_nav()
+            console.log('big mayday reverse path')
+            roam.ResetRoamer()
+            roam.givePath('blasted_lands', path_is_reversed_cus_of_big_bad_monster)
+            current_path = 'blasted_lands'
+            debug('changed path to blasted_lands')
+            roam.walkPath(() => {
+              console.log('continue as usual')
+            })
+          }
+        }
+
         if (target && !targetIsDead) {
           // if (!TargetIsOurs) {
           //   if (!is_feign_deathing) {
@@ -270,6 +375,12 @@ const combat_routine = () => {
           //   }
           // }
 
+          if (!isTargetMob) {
+            debug('Target is not a mob, clearing')
+            clear_target()
+            return
+          }
+
           if (!TargetIsOurs) {
             clear_target()
             should_attack = false
@@ -279,10 +390,7 @@ const combat_routine = () => {
             should_attack = true
             pause_nav()
           }
-          if (!isTargetMob) {
-            debug('Target is not a mob, clearing')
-            clear_target()
-          }
+
           if (!pulled && targetInCombat && !playerInCombat && !moving_to_vendor) {
             debug('!pulled && targetInCombat && !playerInCombat, clearing')
             clear_target()
@@ -440,6 +548,9 @@ const combat_routine = () => {
 
       // not in combat do the after combat shit
       if (!playerInCombat) {
+        if (areBagsFull && STOP_LOOTING_WHEN_BAGS_FULL && !SHOULD_LOOT) {
+          SHOULD_LOOT = false
+        }
         if (SHOULD_LOOT) {
           if (pulled && !target) {
             debug('!playerInCombat && pulled && !target = TLT')
@@ -469,7 +580,7 @@ const combat_routine = () => {
             debug('LOOTING: Moving towards corpse to loot')
             tried_to_loot_counter++
             if (tried_to_loot_counter > 40) {
-              console.log('tried to loot 40 times, skipping')
+              debug('tried to loot 40 times, skipping')
               clear_target()
               resume_path()
               tried_to_loot_counter = 0
@@ -489,7 +600,7 @@ const combat_routine = () => {
             debug('LOOTING: finished looting')
             mobs_looted++
             // tel(mobs_looted)
-            console.log({mobs_looted})
+            debug({mobs_looted})
             resume_path()
             return
           }
@@ -524,7 +635,7 @@ const cast_spell = keybind => {
 
 const debug = message => {
   if (DEBUGGING) {
-    console.log(message)
+    debug(message)
   }
 }
 
@@ -548,8 +659,8 @@ const calculate_nearest_point_to_corpse = (corpseX, corpseY) => {
     }
   })
 
-  console.log(nearest_point)
-  console.log(roam.waypoints()[nearest_point.index])
+  debug(nearest_point)
+  debug(roam.waypoints()[nearest_point.index])
 
   return nearest_point.index
 }
@@ -560,7 +671,7 @@ const resume_path = () => {
     time_since_pull = false
     should_attack = false
     time_since_combat = Date.now()
-    console.log('resume path')
+    debug('resume path')
     roam.resumeNavigation()
     is_looting = false
     has_looted = true
@@ -572,7 +683,7 @@ const resume_path = () => {
 }
 
 const clear_target = () => {
-  console.log('CLEARING TARGET')
+  debug('CLEARING TARGET')
   should_attack = false
   tried_to_cast = 0
   staring_counter = 0
@@ -585,20 +696,20 @@ const clear_target = () => {
 // }
 
 let walk = async () => {
-  console.log(data.info.xcoord, data.info.ycoord)
+  debug(data.info.xcoord, data.info.ycoord)
   // tel('hey')
-  // roam.givePath('tanaris47to50_vendor', false, true)
-  roam.givePath('tanaris47to50')
+  // roam.givePath('blasted_lands_vendor', false, true)
+  roam.givePath('blasted_lands')
   clear_target()
   combat_routine()
   roam.walkPath(() => {
-    console.log('Finished Walking.')
-    roam.givePath('tanaris47to50')
+    debug('Finished Walking.')
+    roam.givePath('blasted_lands')
     roam.resumeNavigation()
   })
 }
 
 setTimeout(() => {
   walk()
-  console.log('starting in 2 seconds')
+  debug('starting in 2 seconds')
 }, 2000)

@@ -5,4 +5,4 @@ const record = require('./NodeGameBot/lib/PathCoordinates/recordCoordinates')
 // corpse run = 'tanaris_deathrun'
 // vendor = 'tanaris_vendor'
 
-record('testfuck')
+record('blasted_lands_vendor')

@@ -7,6 +7,9 @@ let pathModule = require('path')
 let navVariables = fs.readFileSync(pathModule.resolve(__dirname, '../../Database/lib/roamerConstants.json'))
 navVariables = JSON.parse(navVariables)
 
+DEBUGGING = false
+const debug = msg => DEBUGGING && console.log(msg)
+
 // Unstuck constants object
 exports.UNSTUCK = navVariables.unstuck
 const NEAREST_POINT_THRESHOLD = 0.3
@@ -44,7 +47,7 @@ let currentPoint = 1
 
 exports.givePath = (name, reverse, vendor) => {
   vendor_run = vendor || false
-  console.log('CURRENT PATH', name)
+  debug('CURRENT PATH', name)
   curr_path = name
   let ourPath = JSON.parse(fs.readFileSync(pathModule.resolve(__dirname, file_path + name + '.json')))
   if (reverse) {
@@ -75,8 +78,8 @@ exports.assignPath = (coordinates, indexStart = 1) => {
     }
   })
 
-  console.log(nearest_point)
-  console.log(coordinates)
+  debug(nearest_point)
+  debug(coordinates)
   robot.setKeyboardDelay(0) // default delay time
   // store last path travel so it can be recalled
   previousPath = path.slice()
@@ -85,7 +88,7 @@ exports.assignPath = (coordinates, indexStart = 1) => {
   path = coordinates.slice()
   total_waypoints = coordinates.length - 1
   // Resets the currentPoint counter when we start a new path
-  console.log(nearest_point.index, coordinates.length)
+  debug(nearest_point.index, coordinates.length)
   currentPoint = nearest_point.index == coordinates.length - 1 ? 0 : nearest_point.index
   // stores variables from path array into x,y coords
   for (i = 0; i < path.length; i++) {
@@ -124,15 +127,15 @@ class TurningControl {
     if (can_turn) {
       can_turn = false
       robot.keyToggle(key, 'down')
-      console.log('turning', time)
+      debug('turning', time)
       this.turnKey = key
-      console.time('actual time')
+      DEBUGGING && console.time('actual time')
 
       setTimeout(() => {
         robot.keyToggle(key, 'up')
         // robot.keyToggle('s', 'down')
         walkingControl.startWalking()
-        console.timeEnd('actual time')
+        DEBUGGING && console.timeEnd('actual time')
         can_turn = true
       }, time - 150) // -150 cus robot.js delay
     }
@@ -150,7 +153,7 @@ class TurningControl {
       clearTimeout(this.turnTimeout)
       // lift previous key
       robot.keyToggle(this.turnKey, 'up')
-      console.log('STOPPING')
+      debug('STOPPING')
     }
   }
 }
@@ -231,7 +234,7 @@ class StuckPrevention {
     }
 
     if (this.stoppedUpdatesCount > 20) {
-      console.log('Got stuck!')
+      debug('Got stuck!')
       this.unstuckingActive = true
       // Immediately trigger one active update step
       this.activeUpdate(newX, newY)
@@ -240,7 +243,7 @@ class StuckPrevention {
   // Active means currently in the middle of unstucking routine, control the player
   activeUpdate(newX, newY) {
     if (this.unstuckProgress === 0) {
-      console.log('Unstucking...')
+      debug('Unstucking...')
       Math.round(Math.random()) == 1 && robot.keyTap('space')
 
       walkingControl.startWalkingBackwards()
@@ -248,7 +251,7 @@ class StuckPrevention {
       turningControl.askTurnLeft(500)
       this.unstuckProgress++
     } else if (this.unstuckProgress === exports.UNSTUCK.STUCK_BACKWARDS_UPDATES_COUNT) {
-      console.log('Assumed unstuck, resuming...')
+      debug('Assumed unstuck, resuming...')
       this.unstuckProgress = 0
       this.unstuckingActive = false
       walkingControl.startWalking()
@@ -294,7 +297,7 @@ let calculateWowDirection = (playerX, playerY, targetX, targetY) => {
 exports.walkToCorpse = (px, py, accuracy, callback, ROAMSETTINGS) => {
   paused = false
   walking_towards_corpse = true
-  console.log('lets walk to corpse bois')
+  debug('lets walk to corpse bois')
   if (ROAMSETTINGS) {
     ROAMVAR = ROAMSETTINGS
   }
@@ -303,9 +306,9 @@ exports.walkToCorpse = (px, py, accuracy, callback, ROAMSETTINGS) => {
     let distanceToPoint = Math.pointDistance(data.info.xcoord, data.info.ycoord, px, py)
     // if we're close enough, mark the point and move to the next one
     if (distanceToPoint < 0.01) {
-      console.log('REACHED CORPSE')
+      debug('REACHED CORPSE')
       walking_towards_corpse = false
-      // console.log('walkTo: Reached point (' + px + ', ' + py + ')')
+      // debug('walkTo: Reached point (' + px + ', ' + py + ')')
       clearInterval(selfInterval)
       setImmediate(callback)
       return
@@ -323,11 +326,11 @@ exports.walkToCorpse = (px, py, accuracy, callback, ROAMSETTINGS) => {
     let turnTime = (Math.radToDeg(directionDiff) / 360) * 2635
 
     // Stop to do big turns
-    if (Math.abs(turnTime) > (vendor_run ? 190 : 500)) {
-      // console.log('px', px, 'py', py)
-      // console.log('Making a correcting turn')
+    if (Math.abs(turnTime) > (vendor_run ? 300 : 500)) {
+      // debug('px', px, 'py', py)
+      // debug('Making a correcting turn')
       turnTime = (Math.radToDeg(directionDiff) / 360) * 2000 // ROAMVAR.CORRECTING_TURN_TIME_FACTOR
-      // console.log('px', px, 'py', py)
+      // debug('px', px, 'py', py)
       walkingControl.stop()
     } else {
       walkingControl.startWalking()
@@ -372,7 +375,8 @@ exports.walkTo = (px, py, accuracy, callback, ROAMSETTINGS) => {
     ROAMVAR = ROAMSETTINGS
   }
   walkingControl.startWalking()
-  let distanceAccuracy = vendor_run ? 0.005 : 0.01
+  // let distanceAccuracy = vendor_run ? 0.005 : 0.01 //if its very narrow stuff, inside buildings
+  let distanceAccuracy = vendor_run ? 0.01 : 0.01
   let minTurnTime = accuracy === 'fine' ? ROAMVAR.MINIMUM_TURN_TIME_MS / 3 : ROAMVAR.MINIMUM_TURN_TIME_MS
   let navigationFunction = selfInterval => {
     if (walking_towards_corpse) {
@@ -381,7 +385,7 @@ exports.walkTo = (px, py, accuracy, callback, ROAMSETTINGS) => {
     let distanceToPoint = Math.pointDistance(data.info.xcoord, data.info.ycoord, px, py)
     // if we're close enough, mark the point and move to the next one
     if (distanceToPoint < distanceAccuracy) {
-      // console.log('walkTo: Reached point (' + px + ', ' + py + ')')
+      // debug('walkTo: Reached point (' + px + ', ' + py + ')')
       clearInterval(selfInterval)
       setImmediate(callback)
       return
@@ -400,10 +404,10 @@ exports.walkTo = (px, py, accuracy, callback, ROAMSETTINGS) => {
 
     // Stop to do big turns
     if (Math.abs(turnTime) > (vendor_run ? 190 : 500)) {
-      // console.log('px', px, 'py', py)
-      // console.log('Making a correcting turn')
+      // debug('px', px, 'py', py)
+      // debug('Making a correcting turn')
       turnTime = (Math.radToDeg(directionDiff) / 360) * 2000 // ROAMVAR.CORRECTING_TURN_TIME_FACTOR
-      // console.log('px', px, 'py', py)
+      // debug('px', px, 'py', py)
       walkingControl.stop()
     } else {
       walkingControl.startWalking()
@@ -461,13 +465,12 @@ exports.walkPath = callback => {
   ROAMVAR = zoneList.includes(lastPointZone) ? navVariables.special : navVariables.default
   let reachedPointCallback = async () => {
     currentPoint++
-    console.log({currentPoint})
     // If we have reached the end of the path
     if (currentPoint >= path.length) {
       setImmediate(callback)
       //   navigationActive = false
       //   walkingControl.stop()
-      console.log('FINAL POINT')
+      debug('FINAL POINT')
       currentPoint = 1
       // return
     }
@@ -483,7 +486,7 @@ exports.walkPath = callback => {
 }
 
 exports.resumeNavigation = () => {
-  console.log('Resuming navigation')
+  debug('Resuming navigation')
   robot.setKeyboardDelay(10)
   paused = false
   navigationActive = true
@@ -491,7 +494,7 @@ exports.resumeNavigation = () => {
 }
 
 exports.pauseNavigation = () => {
-  console.log('Stopping navigation')
+  debug('Stopping navigation')
   robot.setKeyboardDelay(10)
   paused = true
   navigationActive = false
